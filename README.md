@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-# location-registration-form
-=======
 # Location Registration Form with Cascading Location Hierarchy
 
 A production-ready Google Apps Script Web App for collecting location-based registration data with real-time cascading dropdowns, worldwide country support, Indian State/UT → District → Pincode → Tehsil/Block auto-resolution, duplicate phone & location detection, and automatic Google Sheets database management.
@@ -15,23 +12,25 @@ A production-ready Google Apps Script Web App for collecting location-based regi
   * District → Pincode
   * Pincode → Sub-district / Tehsil / Block (auto-filled)
 * **Worldwide & India Coverage**: Includes 190+ worldwide countries with generic state/postal code fallbacks, plus dedicated deep location cascading for India.
+* **Pre-formatted All-India Dataset**: Includes `RawImport_ready.csv` containing 34,979 unique official Indian pincodes ready to load into Google Sheets.
 * **Duplicate Detection**:
   * **Duplicate Phone**: Server-side block on re-registering existing phone numbers.
   * **Duplicate Location**: Flags identical exact addresses/locations, highlights the row in yellow (`#FFF3CD`) in Google Sheets, and alerts admins.
 * **Admin Email Notifications**: Automated emails sent to the configured admin upon every submission (with flags for duplicates).
 * **High Performance**: Location lists are cached using `CacheService` (6-hour cache) for fast response times.
 * **Auto-managed Database**: Script automatically creates and formats required Google Sheet tabs (`Responses`, `Countries`, `IN_States`, `IN_Districts`, `IN_Pincodes`, `Config`, `RawImport`).
-* **Bulk Import Engine**: Built-in `bulkImportLocationData()` function to easily import full All-India official pincode datasets from data.gov.in.
-* **Responsive Frontend**: Mobile-optimized design with modern visual aesthetics, loading spinners, and status feedback.
+* **Bulk Import Engine**: Built-in `bulkImportLocationData()` function to easily import full All-India official pincode datasets.
 
 ---
 
 ## 📁 Repository Structure
 
 ```
-├── Code.gs      # Google Apps Script backend logic, database management, RPC endpoints & validations
-├── Index.html   # Web app frontend HTML, CSS styling, and client-side JavaScript logic
-└── README.md    # Setup, deployment, data import, and GitHub hosting guide
+├── Code.gs                 # Google Apps Script backend logic, database management, RPC endpoints & validations
+├── Index.html              # Web app frontend HTML, CSS styling, and client-side JavaScript logic
+├── RawImport_ready.csv     # Pre-formatted All-India Pincode dataset (34,979 records ready for RawImport sheet)
+├── format_pincode_csv.py   # Python utility script to format custom raw pincode CSV files
+└── README.md               # Setup, deployment, data import, and GitHub hosting guide
 ```
 
 ---
@@ -52,50 +51,21 @@ A production-ready Google Apps Script Web App for collecting location-based regi
 
 ### 4. Initialize Database Schema
 1. In the function dropdown at the top of the editor, select **`setupSheets`** and click **Run**.
-2. Authorize the OAuth prompts when requested (allows the script to manage the sheet and send emails).
-3. Select **`seedIndiaSampleData`** from the function dropdown and click **Run**. This loads demo states, districts, and pincodes for immediate testing.
+2. Authorize the OAuth prompts when requested.
 
-### 5. Deploy as Web App
+### 5. Populate Full All-India Location Dataset
+1. Open your Google Sheet and select the **`RawImport`** tab.
+2. Import or paste the records from [`RawImport_ready.csv`](RawImport_ready.csv) starting at **Row 2** (keep Row 1 headers intact).
+3. In the Apps Script editor, select **`bulkImportLocationData`** from the function dropdown and click **Run**.
+
+### 6. Deploy as Web App
 1. Click **Deploy → New deployment**.
 2. Click the gear icon next to **Select type** and choose **Web app**.
 3. Configure settings:
    * **Description**: Location Registration Form v1.0
    * **Execute as**: `Me` (your Google account)
-   * **Who has access**: `Anyone` (or *Anyone within [your organization]* for internal use)
+   * **Who has access**: `Anyone` (or *Anyone within [your organization]*)
 4. Click **Deploy**, copy the generated **Web App URL**, and open it in your browser.
-
----
-
-## 📊 How to Import the Full All-India Location Dataset
-
-The demo dataset covers sample districts and pincodes. To populate the complete official dataset across India:
-
-1. **Download Official Data**: Obtain the *All India Pincode Directory* published by the Department of Posts via [data.gov.in](https://data.gov.in).
-2. **Format Source File**: Clean the dataset to **exactly four columns** in this specific order:
-   * Column A: `State/UT`
-   * Column B: `District`
-   * Column C: `Pincode`
-   * Column D: `Tehsil/Block` (or Sub-district)
-3. **Paste into Sheet**: Open your Google Sheet, switch to the automatically generated **`RawImport`** sheet, and paste your formatted data starting at **Row 2** (keep Row 1 headers intact).
-4. **Run Bulk Import**:
-   * Open the Apps Script editor.
-   * Select **`bulkImportLocationData`** from the function dropdown and click **Run**.
-   * The script will deduplicate entries, build `IN_States`, `IN_Districts`, and `IN_Pincodes` tabs, and automatically flush the cache.
-5. **Verify Form**: Refresh your Web App URL. The dropdown cascade will now reflect the full dataset.
-
----
-
-## 🛠 Database Schema Overview
-
-| Sheet Name | Purpose |
-| :--- | :--- |
-| **`Responses`** | Stores all form submissions with timestamp, contact info, location details, duplicate flags, and review status. |
-| **`Countries`** | List of worldwide countries. |
-| **`IN_States`** | Unique list of Indian States and Union Territories. |
-| **`IN_Districts`** | Mapping of State/UT to District. |
-| **`IN_Pincodes`** | Mapping of District to Pincode and Tehsil/Block. |
-| **`Config`** | Configuration settings (e.g., `AdminEmail`, `FormTitle`). |
-| **`RawImport`** | Staging tab for bulk importing location directory data. |
 
 ---
 
@@ -103,21 +73,10 @@ The demo dataset covers sample districts and pincodes. To populate the complete 
 
 To host and manage this project repository under your GitHub account:
 
-### Push Repository to GitHub:
 ```bash
-# Initialize local git repository
-git init
+cd /Users/abhyuday/Desktop/Tesseract
 
-# Add all files
-git add Code.gs Index.html README.md
-
-# Commit changes
-git commit -m "Initial commit: Location Registration Web App with cascading dropdowns"
-
-# Set main branch
-git branch -M main
-
-# Add remote repository link (create repository on github.com first)
+# Add remote repository link
 git remote add origin https://github.com/tesseractthou-code/location-registration-form.git
 
 # Push to GitHub
@@ -128,4 +87,3 @@ git push -u origin main
 
 ## 📄 License
 This project is open-source and available under the [MIT License](LICENSE).
->>>>>>> 3cb10b4 (Initial commit: Location Registration Web App with cascading dropdowns)
