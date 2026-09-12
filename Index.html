@@ -103,6 +103,12 @@
   </style>
 </head>
 <body>
+  <div id="ghBanner" style="display:none; max-width:560px; margin: 0 auto 12px; padding: 10px 14px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; font-size: 0.82rem; color: #1e40af; text-align: center;">
+    🌐 <strong>GitHub Pages Mode</strong> | 
+    <span id="urlStatus">Backend Connected</span> 
+    <button type="button" id="configUrlBtn" style="margin-left:8px; padding:3px 8px; font-size:0.75rem; border:1px solid #3b82f6; background:#fff; color:#2563eb; border-radius:4px; cursor:pointer;">Configure Apps Script URL</button>
+  </div>
+
   <div class="card">
     <h1>Location Registration Form</h1>
     <p class="subtitle">Fields marked <span class="req">*</span> are required.</p>
@@ -180,8 +186,64 @@
       form: document.getElementById('regForm'),
       submitBtn: document.getElementById('submitBtn'),
       spinner: document.getElementById('spinner'),
-      msgBox: document.getElementById('msgBox')
+      msgBox: document.getElementById('msgBox'),
+      ghBanner: document.getElementById('ghBanner'),
+      configUrlBtn: document.getElementById('configUrlBtn'),
+      urlStatus: document.getElementById('urlStatus')
     };
+
+    var isAppsScript = typeof google !== 'undefined' && google.script && google.script.run;
+    var webAppUrl = localStorage.getItem('apps_script_web_app_url') || '';
+
+    if (!isAppsScript) {
+      els.ghBanner.style.display = 'block';
+      els.urlStatus.textContent = webAppUrl ? 'Backend URL set' : 'Backend URL required';
+      els.configUrlBtn.addEventListener('click', function() {
+        var inputUrl = prompt('Enter your deployed Google Apps Script Web App URL:', webAppUrl);
+        if (inputUrl !== null) {
+          webAppUrl = inputUrl.trim();
+          localStorage.setItem('apps_script_web_app_url', webAppUrl);
+          els.urlStatus.textContent = webAppUrl ? 'Backend URL set' : 'Backend URL required';
+          loadCountries();
+        }
+      });
+    }
+
+    function callBackend(action, args, onSuccess, onFailure) {
+      if (isAppsScript) {
+        var runner = google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure);
+        runner[action].apply(runner, args);
+      } else {
+        if (!webAppUrl) {
+          var inputUrl = prompt('GitHub Pages Mode: Enter your deployed Apps Script Web App URL to connect database:');
+          if (inputUrl && inputUrl.trim()) {
+            webAppUrl = inputUrl.trim();
+            localStorage.setItem('apps_script_web_app_url', webAppUrl);
+            els.urlStatus.textContent = 'Backend URL set';
+          } else {
+            onFailure(new Error('Google Apps Script Web App URL is required on GitHub Pages.'));
+            return;
+          }
+        }
+        var url = new URL(webAppUrl);
+        url.searchParams.append('action', action);
+        if (action === 'getStates') url.searchParams.append('country', args[0]);
+        if (action === 'getDistricts') url.searchParams.append('state', args[0]);
+        if (action === 'getPincodes') url.searchParams.append('district', args[0]);
+        if (action === 'getTehsil') {
+          url.searchParams.append('district', args[0]);
+          url.searchParams.append('pincode', args[1]);
+        }
+        if (action === 'submitForm') {
+          url.searchParams.append('payload', JSON.stringify(args[0]));
+        }
+
+        fetch(url.toString())
+          .then(function(res) { return res.json(); })
+          .then(function(data) { onSuccess(data); })
+          .catch(function(err) { onFailure(err); });
+      }
+    }
 
     function fillSelect(select, items, placeholder) {
       select.innerHTML = '';
@@ -209,11 +271,15 @@
     }
 
     // ---- Initial load: countries ----
-    google.script.run.withSuccessHandler(function (countries) {
-      fillSelect(els.country, countries, 'Select country');
-    }).withFailureHandler(function (err) {
-      showMsg('error', 'Could not load countries: ' + err.message);
-    }).getCountries();
+    function loadCountries() {
+      callBackend('getCountries', [], function (countries) {
+        fillSelect(els.country, countries, 'Select country');
+      }, function (err) {
+        showMsg('error', 'Could not load countries: ' + err.message);
+      });
+    }
+
+    loadCountries();
 
     // ---- Country change ----
     els.country.addEventListener('change', function () {
@@ -226,11 +292,11 @@
       if (country === 'India') {
         els.indiaFields.style.display = 'block';
         els.genericFields.style.display = 'none';
-        google.script.run.withSuccessHandler(function (states) {
+        callBackend('getStates', [country], function (states) {
           fillSelect(els.state, states, 'Select state / UT');
-        }).withFailureHandler(function (err) {
+        }, function (err) {
           showMsg('error', 'Could not load states: ' + err.message);
-        }).getStates(country);
+        });
       } else if (country) {
         els.indiaFields.style.display = 'none';
         els.genericFields.style.display = 'block';
@@ -247,11 +313,11 @@
       fillSelect(els.pincode, [], 'Select district first');
       els.tehsil.value = '';
       if (!state) return;
-      google.script.run.withSuccessHandler(function (districts) {
+      callBackend('getDistricts', [state], function (districts) {
         fillSelect(els.district, districts, 'Select district');
-      }).withFailureHandler(function (err) {
+      }, function (err) {
         showMsg('error', 'Could not load districts: ' + err.message);
-      }).getDistricts(state);
+      });
     });
 
     // ---- District change ----
@@ -260,11 +326,11 @@
       fillSelect(els.pincode, [], 'Loading…');
       els.tehsil.value = '';
       if (!district) return;
-      google.script.run.withSuccessHandler(function (pincodes) {
+      callBackend('getPincodes', [district], function (pincodes) {
         fillSelect(els.pincode, pincodes, 'Select pincode');
-      }).withFailureHandler(function (err) {
+      }, function (err) {
         showMsg('error', 'Could not load pincodes: ' + err.message);
-      }).getPincodes(district);
+      });
     });
 
     // ---- Pincode change -> auto-fill tehsil ----
@@ -273,9 +339,11 @@
       var pincode = els.pincode.value;
       els.tehsil.value = '';
       if (!district || !pincode) return;
-      google.script.run.withSuccessHandler(function (tehsil) {
+      callBackend('getTehsil', [district, pincode], function (tehsil) {
         els.tehsil.value = tehsil || '(not on file)';
-      }).getTehsil(district, pincode);
+      }, function (err) {
+        els.tehsil.value = '(error)';
+      });
     });
 
     // ---- Submit ----
@@ -309,29 +377,26 @@
       els.submitBtn.disabled = true;
       els.spinner.style.display = 'inline-block';
 
-      google.script.run
-        .withSuccessHandler(function (result) {
-          els.submitBtn.disabled = false;
-          els.spinner.style.display = 'none';
-          if (!result.success) {
-            showMsg('error', result.message || 'Submission failed.');
-            return;
-          }
-          if (result.duplicateLocation) {
-            showMsg('warn', 'Submitted — note: this exact location/address already exists in our records and has been flagged for review.');
-          } else {
-            showMsg('success', 'Thank you! Your submission has been recorded.');
-          }
-          els.form.reset();
-          els.indiaFields.style.display = 'none';
-          els.genericFields.style.display = 'none';
-        })
-        .withFailureHandler(function (err) {
-          els.submitBtn.disabled = false;
-          els.spinner.style.display = 'none';
-          showMsg('error', 'Server error: ' + err.message);
-        })
-        .submitForm(payload);
+      callBackend('submitForm', [payload], function (result) {
+        els.submitBtn.disabled = false;
+        els.spinner.style.display = 'none';
+        if (!result || !result.success) {
+          showMsg('error', (result && result.message) || 'Submission failed.');
+          return;
+        }
+        if (result.duplicateLocation) {
+          showMsg('warn', 'Submitted — note: this exact location/address already exists in our records and has been flagged for review.');
+        } else {
+          showMsg('success', 'Thank you! Your submission has been recorded.');
+        }
+        els.form.reset();
+        els.indiaFields.style.display = 'none';
+        els.genericFields.style.display = 'none';
+      }, function (err) {
+        els.submitBtn.disabled = false;
+        els.spinner.style.display = 'none';
+        showMsg('error', 'Server error: ' + err.message);
+      });
     });
   </script>
 </body>

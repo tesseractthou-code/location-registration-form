@@ -36,15 +36,61 @@ var SHEET_NAMES = {
 var CACHE_SECONDS = 21600; // 6 hours
 
 // ------------------------------------------------------------------
-// WEB APP ENTRY POINT
+// WEB APP ENTRY POINT & REST API (FOR GITHUB PAGES COMPATIBILITY)
 // ------------------------------------------------------------------
 
-function doGet() {
+function doGet(e) {
+  if (e && e.parameter && e.parameter.action) {
+    return handleApiGetRequest(e.parameter);
+  }
   return HtmlService.createTemplateFromFile('Index')
     .evaluate()
     .setTitle(getConfig('FormTitle') || 'Location Registration Form')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function doPost(e) {
+  var payload;
+  try {
+    if (e && e.postData && e.postData.contents) {
+      payload = JSON.parse(e.postData.contents);
+    } else if (e && e.parameter) {
+      payload = e.parameter;
+    }
+  } catch (err) {
+    payload = (e && e.parameter) || {};
+  }
+  var result = submitForm(payload);
+  return ContentService.createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function handleApiGetRequest(params) {
+  var action = params.action;
+  var result;
+  try {
+    if (action === 'getCountries') {
+      result = getCountries();
+    } else if (action === 'getStates') {
+      result = getStates(params.country);
+    } else if (action === 'getDistricts') {
+      result = getDistricts(params.state);
+    } else if (action === 'getPincodes') {
+      result = getPincodes(params.district);
+    } else if (action === 'getTehsil') {
+      result = getTehsil(params.district, params.pincode);
+    } else if (action === 'submitForm') {
+      var p = params.payload ? JSON.parse(params.payload) : params;
+      result = submitForm(p);
+    } else {
+      result = { error: 'Unknown action' };
+    }
+  } catch (err) {
+    result = { success: false, error: err.message };
+  }
+  return ContentService.createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 // ------------------------------------------------------------------
