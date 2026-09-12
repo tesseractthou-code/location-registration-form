@@ -103,14 +103,13 @@
   </style>
 </head>
 <body>
-  <div id="ghBanner" style="display:none; max-width:560px; margin: 0 auto 12px; padding: 10px 14px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; font-size: 0.82rem; color: #1e40af; text-align: center;">
-    🌐 <strong>GitHub Pages Mode</strong> | 
-    <span id="urlStatus">Backend Connected</span> 
-    <button type="button" id="configUrlBtn" style="margin-left:8px; padding:3px 8px; font-size:0.75rem; border:1px solid #3b82f6; background:#fff; color:#2563eb; border-radius:4px; cursor:pointer;">Configure Apps Script URL</button>
-  </div>
-
   <div class="card">
-    <h1>Location Registration Form</h1>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+      <h1 style="margin: 0;">Location Registration Form</h1>
+      <button type="button" id="configUrlBtn" style="font-size: 0.78rem; border: 1px solid #d1d5db; background: #f9fafb; color: #4b5563; padding: 4px 8px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+        ⚙️ <span id="urlStatus">DB Connected</span>
+      </button>
+    </div>
     <p class="subtitle">Fields marked <span class="req">*</span> are required.</p>
 
     <form id="regForm">
@@ -187,7 +186,6 @@
       submitBtn: document.getElementById('submitBtn'),
       spinner: document.getElementById('spinner'),
       msgBox: document.getElementById('msgBox'),
-      ghBanner: document.getElementById('ghBanner'),
       configUrlBtn: document.getElementById('configUrlBtn'),
       urlStatus: document.getElementById('urlStatus')
     };
@@ -208,17 +206,18 @@
 
 
     if (!isAppsScript) {
-      els.ghBanner.style.display = 'block';
-      els.urlStatus.textContent = webAppUrl ? 'Backend URL set' : 'Backend URL required';
+      els.urlStatus.textContent = webAppUrl ? 'DB Connected' : 'Set DB URL';
+      els.configUrlBtn.style.display = 'inline-flex';
       els.configUrlBtn.addEventListener('click', function() {
-        var inputUrl = prompt('Enter your deployed Google Apps Script Web App URL:', webAppUrl);
+        var inputUrl = prompt('Enter your deployed Google Apps Script Web App URL to connect Google Sheets:', webAppUrl);
         if (inputUrl !== null) {
           webAppUrl = inputUrl.trim();
           localStorage.setItem('apps_script_web_app_url', webAppUrl);
-          els.urlStatus.textContent = webAppUrl ? 'Backend URL set' : 'Backend URL required';
-          loadCountries();
+          els.urlStatus.textContent = webAppUrl ? 'DB Connected' : 'Set DB URL';
         }
       });
+    } else {
+      els.configUrlBtn.style.display = 'none';
     }
 
     var DEFAULT_COUNTRIES = [
