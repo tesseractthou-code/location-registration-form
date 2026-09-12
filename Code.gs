@@ -348,13 +348,22 @@ function uniqueSorted(arr) {
 function getCountries() {
   var cache = CacheService.getScriptCache();
   var cached = cache.get('countries_list');
-  if (cached) return JSON.parse(cached);
+  if (cached) {
+    var parsed = JSON.parse(cached);
+    if (parsed && parsed.length) return parsed;
+  }
 
   var sh = getOrCreateSheet(SHEET_NAMES.COUNTRIES, ['Country']);
+  if (sh.getLastRow() <= 1) {
+    seedCountries();
+  }
   var n = Math.max(sh.getLastRow() - 1, 0);
   var values = n ? sh.getRange(2, 1, n, 1).getValues().map(function (r) { return r[0]; }) : [];
   values = uniqueSorted(values);
-  cache.put('countries_list', JSON.stringify(values), CACHE_SECONDS);
+
+  if (values.length) {
+    cache.put('countries_list', JSON.stringify(values), CACHE_SECONDS);
+  }
   return values;
 }
 
@@ -362,12 +371,30 @@ function getStates(country) {
   if (country !== 'India') return [];
   var cache = CacheService.getScriptCache();
   var cached = cache.get('in_states_list');
-  if (cached) return JSON.parse(cached);
+  if (cached) {
+    var parsed = JSON.parse(cached);
+    if (parsed && parsed.length) return parsed;
+  }
 
   var sh = getOrCreateSheet(SHEET_NAMES.STATES, ['State/UT']);
+  if (sh.getLastRow() <= 1) {
+    seedIndiaSampleData();
+  }
   var n = Math.max(sh.getLastRow() - 1, 0);
   var values = n ? sh.getRange(2, 1, n, 1).getValues().map(function (r) { return r[0]; }) : [];
   values = uniqueSorted(values);
+
+  if (!values.length) {
+    values = [
+      'Andaman and Nicobar Islands','Andhra Pradesh','Arunachal Pradesh','Assam','Bihar',
+      'Chandigarh','Chhattisgarh','Dadra and Nagar Haveli and Daman and Diu','Delhi','Goa',
+      'Gujarat','Haryana','Himachal Pradesh','Jammu and Kashmir','Jharkhand','Karnataka',
+      'Kerala','Ladakh','Lakshadweep','Madhya Pradesh','Maharashtra','Manipur','Meghalaya',
+      'Mizoram','Nagaland','Odisha','Puducherry','Punjab','Rajasthan','Sikkim','Tamil Nadu',
+      'Telangana','Tripura','Uttar Pradesh','Uttarakhand','West Bengal'
+    ];
+  }
+
   cache.put('in_states_list', JSON.stringify(values), CACHE_SECONDS);
   return values;
 }

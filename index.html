@@ -1009,7 +1009,21 @@
 
     function callBackend(action, args, onSuccess, onFailure) {
       if (isAppsScript) {
-        var runner = google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure);
+        var runner = google.script.run
+          .withSuccessHandler(function (res) {
+            if (action === 'getStates' && (!Array.isArray(res) || res.length === 0)) {
+              onSuccess(DEFAULT_INDIAN_STATES);
+            } else {
+              onSuccess(res);
+            }
+          })
+          .withFailureHandler(function (err) {
+            if (action === 'getStates') {
+              onSuccess(DEFAULT_INDIAN_STATES);
+            } else if (onFailure) {
+              onFailure(err);
+            }
+          });
         runner[action].apply(runner, args);
       } else {
         if (action === 'getCountries') {
@@ -1018,7 +1032,21 @@
         }
 
         if (action === 'getStates') {
-          onSuccess(DEFAULT_INDIAN_STATES);
+          if (webAppUrl) {
+            try {
+              var u = new URL(webAppUrl);
+              u.searchParams.append('action', 'getStates');
+              u.searchParams.append('country', args[0]);
+              fetch(u.toString())
+                .then(function(res) { return res.json(); })
+                .then(function(data) { onSuccess(Array.isArray(data) && data.length ? data : DEFAULT_INDIAN_STATES); })
+                .catch(function() { onSuccess(DEFAULT_INDIAN_STATES); });
+            } catch(e) {
+              onSuccess(DEFAULT_INDIAN_STATES);
+            }
+          } else {
+            onSuccess(DEFAULT_INDIAN_STATES);
+          }
           return;
         }
 
