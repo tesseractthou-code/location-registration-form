@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --border: #d1d5db;
+      --bg: #f8fafc;
+      --error: #dc2626;
+      --warn-bg: #fff7ed;
+      --warn-border: #fb923c;
+      --success: #16a34a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: var(--bg);
+      margin: 0;
+      padding: 16px;
+      color: #1f2937;
+    }
+    .card {
+      max-width: 560px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    h1 { font-size: 1.35rem; margin: 0 0 4px; }
+    p.subtitle { color: #6b7280; margin: 0 0 20px; font-size: 0.9rem; }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin: 14px 0 6px;
+    }
+    label .req { color: var(--error); }
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      background: #fff;
+    }
+    input:disabled, select:disabled {
+      background: #f3f4f6;
+      color: #9ca3af;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+    }
+    .hint { font-size: 0.78rem; color: #6b7280; margin-top: 4px; }
+    button[type="submit"] {
+      width: 100%;
+      margin-top: 22px;
+      padding: 13px;
+      border: none;
+      border-radius: 8px;
+      background: var(--primary);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button[type="submit"]:hover { background: var(--primary-dark); }
+    button[type="submit"]:disabled {
+      background: #9ca3af;
+      cursor: not-allowed;
+    }
+    .msg {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      display: none;
+    }
+    .msg.error { display: block; background: #fef2f2; color: var(--error); border: 1px solid #fca5a5; }
+    .msg.warn { display: block; background: var(--warn-bg); color: #9a3412; border: 1px solid var(--warn-border); }
+    .msg.success { display: block; background: #f0fdf4; color: var(--success); border: 1px solid #86efac; }
+    .row-2 { display: flex; gap: 12px; }
+    .row-2 > div { flex: 1; }
+    .spinner {
+      display: none;
+      width: 16px; height: 16px;
+      border: 2px solid #fff;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-left: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn-content { display: flex; align-items: center; justify-content: center; }
+    @media (max-width: 480px) {
+      .card { padding: 18px; border-radius: 8px; }
+      .row-2 { flex-direction: column; gap: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Location Registration Form</h1>
+    <p class="subtitle">Fields marked <span class="req">*</span> are required.</p>
+
+    <form id="regForm">
+      <label>Full Name <span class="req">*</span></label>
+      <input type="text" id="name" required>
+
+      <div class="row-2">
+        <div>
+          <label>Phone <span class="req">*</span></label>
+          <input type="tel" id="phone" required placeholder="e.g. 9876543210">
+        </div>
+        <div>
+          <label>Email</label>
+          <input type="email" id="email" placeholder="optional">
+        </div>
+      </div>
+
+      <label>Country <span class="req">*</span></label>
+      <select id="country" required>
+        <option value="">Loading countries…</option>
+      </select>
+
+      <!-- India-specific cascading fields -->
+      <div id="indiaFields" style="display:none;">
+        <label>State / UT <span class="req">*</span></label>
+        <select id="state" disabled>
+          <option value="">Select country first</option>
+        </select>
+
+        <label>District <span class="req">*</span></label>
+        <select id="district" disabled>
+          <option value="">Select state first</option>
+        </select>
+
+        <label>Pincode <span class="req">*</span></label>
+        <select id="pincode" disabled>
+          <option value="">Select district first</option>
+        </select>
+
+        <label>Sub-district / Tehsil / Block</label>
+        <input type="text" id="tehsil" readonly placeholder="Auto-filled from pincode">
+      </div>
+
+      <!-- Generic fields for non-India countries -->
+      <div id="genericFields" style="display:none;">
+        <label>State / Province / Region</label>
+        <input type="text" id="stateGeneric" placeholder="e.g. California">
+        <label>Postal / ZIP Code</label>
+        <input type="text" id="postalGeneric" placeholder="e.g. 94105">
+      </div>
+
+      <label>Address</label>
+      <input type="text" id="address" placeholder="House / street / locality">
+      <div class="hint">Used for duplicate-location detection alongside your pincode.</div>
+
+      <button type="submit" id="submitBtn">
+        <span class="btn-content">Submit <span class="spinner" id="spinner"></span></span>
+      </button>
+
+      <div class="msg" id="msgBox"></div>
+    </form>
+  </div>
+
+  <script>
+    var els = {
+      country: document.getElementById('country'),
+      indiaFields: document.getElementById('indiaFields'),
+      genericFields: document.getElementById('genericFields'),
+      state: document.getElementById('state'),
+      district: document.getElementById('district'),
+      pincode: document.getElementById('pincode'),
+      tehsil: document.getElementById('tehsil'),
+      form: document.getElementById('regForm'),
+      submitBtn: document.getElementById('submitBtn'),
+      spinner: document.getElementById('spinner'),
+      msgBox: document.getElementById('msgBox')
+    };
+
+    function fillSelect(select, items, placeholder) {
+      select.innerHTML = '';
+      var ph = document.createElement('option');
+      ph.value = '';
+      ph.textContent = placeholder;
+      select.appendChild(ph);
+      items.forEach(function (item) {
+        var opt = document.createElement('option');
+        opt.value = item;
+        opt.textContent = item;
+        select.appendChild(opt);
+      });
+      select.disabled = items.length === 0;
+    }
+
+    function showMsg(type, text) {
+      els.msgBox.className = 'msg ' + type;
+      els.msgBox.textContent = text;
+    }
+
+    function clearMsg() {
+      els.msgBox.className = 'msg';
+      els.msgBox.textContent = '';
+    }
+
+    // ---- Initial load: countries ----
+    google.script.run.withSuccessHandler(function (countries) {
+      fillSelect(els.country, countries, 'Select country');
+    }).withFailureHandler(function (err) {
+      showMsg('error', 'Could not load countries: ' + err.message);
+    }).getCountries();
+
+    // ---- Country change ----
+    els.country.addEventListener('change', function () {
+      var country = els.country.value;
+      fillSelect(els.state, [], 'Loading…');
+      fillSelect(els.district, [], 'Select state first');
+      fillSelect(els.pincode, [], 'Select district first');
+      els.tehsil.value = '';
+
+      if (country === 'India') {
+        els.indiaFields.style.display = 'block';
+        els.genericFields.style.display = 'none';
+        google.script.run.withSuccessHandler(function (states) {
+          fillSelect(els.state, states, 'Select state / UT');
+        }).withFailureHandler(function (err) {
+          showMsg('error', 'Could not load states: ' + err.message);
+        }).getStates(country);
+      } else if (country) {
+        els.indiaFields.style.display = 'none';
+        els.genericFields.style.display = 'block';
+      } else {
+        els.indiaFields.style.display = 'none';
+        els.genericFields.style.display = 'none';
+      }
+    });
+
+    // ---- State change ----
+    els.state.addEventListener('change', function () {
+      var state = els.state.value;
+      fillSelect(els.district, [], 'Loading…');
+      fillSelect(els.pincode, [], 'Select district first');
+      els.tehsil.value = '';
+      if (!state) return;
+      google.script.run.withSuccessHandler(function (districts) {
+        fillSelect(els.district, districts, 'Select district');
+      }).withFailureHandler(function (err) {
+        showMsg('error', 'Could not load districts: ' + err.message);
+      }).getDistricts(state);
+    });
+
+    // ---- District change ----
+    els.district.addEventListener('change', function () {
+      var district = els.district.value;
+      fillSelect(els.pincode, [], 'Loading…');
+      els.tehsil.value = '';
+      if (!district) return;
+      google.script.run.withSuccessHandler(function (pincodes) {
+        fillSelect(els.pincode, pincodes, 'Select pincode');
+      }).withFailureHandler(function (err) {
+        showMsg('error', 'Could not load pincodes: ' + err.message);
+      }).getPincodes(district);
+    });
+
+    // ---- Pincode change -> auto-fill tehsil ----
+    els.pincode.addEventListener('change', function () {
+      var district = els.district.value;
+      var pincode = els.pincode.value;
+      els.tehsil.value = '';
+      if (!district || !pincode) return;
+      google.script.run.withSuccessHandler(function (tehsil) {
+        els.tehsil.value = tehsil || '(not on file)';
+      }).getTehsil(district, pincode);
+    });
+
+    // ---- Submit ----
+    els.form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      clearMsg();
+
+      var country = els.country.value;
+      var payload = {
+        name: document.getElementById('name').value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        country: country,
+        address: document.getElementById('address').value.trim()
+      };
+
+      if (country === 'India') {
+        payload.state = els.state.value;
+        payload.district = els.district.value;
+        payload.pincode = els.pincode.value;
+        payload.tehsil = els.tehsil.value;
+        if (!payload.state || !payload.district || !payload.pincode) {
+          showMsg('error', 'Please complete State, District and Pincode.');
+          return;
+        }
+      } else {
+        payload.state = document.getElementById('stateGeneric').value.trim();
+        payload.pincode = document.getElementById('postalGeneric').value.trim();
+      }
+
+      els.submitBtn.disabled = true;
+      els.spinner.style.display = 'inline-block';
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          els.submitBtn.disabled = false;
+          els.spinner.style.display = 'none';
+          if (!result.success) {
+            showMsg('error', result.message || 'Submission failed.');
+            return;
+          }
+          if (result.duplicateLocation) {
+            showMsg('warn', 'Submitted — note: this exact location/address already exists in our records and has been flagged for review.');
+          } else {
+            showMsg('success', 'Thank you! Your submission has been recorded.');
+          }
+          els.form.reset();
+          els.indiaFields.style.display = 'none';
+          els.genericFields.style.display = 'none';
+        })
+        .withFailureHandler(function (err) {
+          els.submitBtn.disabled = false;
+          els.spinner.style.display = 'none';
+          showMsg('error', 'Server error: ' + err.message);
+        })
+        .submitForm(payload);
+    });
+  </script>
+</body>
+</html>
