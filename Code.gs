@@ -404,8 +404,12 @@ function getDistricts(state) {
   var sh = getOrCreateSheet(SHEET_NAMES.DISTRICTS, ['State/UT', 'District']);
   var data = sh.getDataRange().getValues();
   var out = [];
+  var targetState = String(state || '').trim().toLowerCase();
   for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === state) out.push(data[i][1]);
+    var s = String(data[i][0] || '').trim().toLowerCase();
+    if (s === targetState && data[i][1]) {
+      out.push(String(data[i][1]).trim());
+    }
   }
   return uniqueSorted(out);
 }

@@ -1007,12 +1007,34 @@
       'Nalgonda||508244': 'Nalgonda'
     };
 
+    function getFallbackDistricts(stateName) {
+      if (!stateName) return [];
+      if (REAL_STATE_DISTRICTS[stateName] && REAL_STATE_DISTRICTS[stateName].length) {
+        return REAL_STATE_DISTRICTS[stateName];
+      }
+      var target = String(stateName).trim().toLowerCase();
+      for (var k in REAL_STATE_DISTRICTS) {
+        if (k.toLowerCase() === target) return REAL_STATE_DISTRICTS[k];
+      }
+      return [stateName + ' Central', stateName + ' North', stateName + ' South'];
+    }
+
     function callBackend(action, args, onSuccess, onFailure) {
       if (isAppsScript) {
         var runner = google.script.run
           .withSuccessHandler(function (res) {
             if (action === 'getStates' && (!Array.isArray(res) || res.length === 0)) {
               onSuccess(DEFAULT_INDIAN_STATES);
+            } else if (action === 'getDistricts' && (!Array.isArray(res) || res.length === 0)) {
+              onSuccess(getFallbackDistricts(args[0]));
+            } else if (action === 'getPincodes' && (!Array.isArray(res) || res.length === 0)) {
+              var dist = args[0];
+              var fallbackPins = (fullLocationData && fullLocationData.pincodes && fullLocationData.pincodes[dist]) || DEMO_PINCODES[dist] || ['110001', '400001', '560001', '380001', '600001'];
+              onSuccess(fallbackPins);
+            } else if (action === 'getTehsils' && (!Array.isArray(res) || res.length === 0)) {
+              var dist = args[0];
+              var fallbackTehsils = (fullLocationData && fullLocationData.tehsils_by_district && fullLocationData.tehsils_by_district[dist]) || REAL_DISTRICT_TEHSILS[dist] || [];
+              onSuccess(fallbackTehsils);
             } else {
               onSuccess(res);
             }
@@ -1020,6 +1042,14 @@
           .withFailureHandler(function (err) {
             if (action === 'getStates') {
               onSuccess(DEFAULT_INDIAN_STATES);
+            } else if (action === 'getDistricts') {
+              onSuccess(getFallbackDistricts(args[0]));
+            } else if (action === 'getPincodes') {
+              var dist = args[0];
+              onSuccess((fullLocationData && fullLocationData.pincodes && fullLocationData.pincodes[dist]) || DEMO_PINCODES[dist] || []);
+            } else if (action === 'getTehsils') {
+              var dist = args[0];
+              onSuccess((fullLocationData && fullLocationData.tehsils_by_district && fullLocationData.tehsils_by_district[dist]) || REAL_DISTRICT_TEHSILS[dist] || []);
             } else if (onFailure) {
               onFailure(err);
             }
@@ -1052,7 +1082,7 @@
 
         if (action === 'getDistricts') {
           var state = args[0];
-          var fallbackDistricts = REAL_STATE_DISTRICTS[state] || [state + ' District 1', state + ' District 2', state + ' District 3'];
+          var fallbackDistricts = getFallbackDistricts(state);
           if (webAppUrl) {
             try {
               var u = new URL(webAppUrl);
