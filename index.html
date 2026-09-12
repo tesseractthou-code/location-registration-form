@@ -1019,6 +1019,54 @@
       return [stateName + ' Central', stateName + ' North', stateName + ' South'];
     }
 
+    function getFallbackPincodes(distName) {
+      if (!distName) return [];
+      var target = String(distName).trim().toLowerCase();
+      if (fullLocationData && fullLocationData.pincodes) {
+        if (fullLocationData.pincodes[distName] && fullLocationData.pincodes[distName].length) {
+          return fullLocationData.pincodes[distName];
+        }
+        for (var k in fullLocationData.pincodes) {
+          if (k.toLowerCase() === target && fullLocationData.pincodes[k].length) {
+            return fullLocationData.pincodes[k];
+          }
+        }
+      }
+      if (DEMO_PINCODES[distName] && DEMO_PINCODES[distName].length) {
+        return DEMO_PINCODES[distName];
+      }
+      for (var d in DEMO_PINCODES) {
+        if (d.toLowerCase() === target && DEMO_PINCODES[d].length) {
+          return DEMO_PINCODES[d];
+        }
+      }
+      return ['110001', '400001', '560001', '380001', '600001'];
+    }
+
+    function getFallbackTehsils(distName) {
+      if (!distName) return [];
+      var target = String(distName).trim().toLowerCase();
+      if (fullLocationData && fullLocationData.tehsils_by_district) {
+        if (fullLocationData.tehsils_by_district[distName] && fullLocationData.tehsils_by_district[distName].length) {
+          return fullLocationData.tehsils_by_district[distName];
+        }
+        for (var k in fullLocationData.tehsils_by_district) {
+          if (k.toLowerCase() === target && fullLocationData.tehsils_by_district[k].length) {
+            return fullLocationData.tehsils_by_district[k];
+          }
+        }
+      }
+      if (REAL_DISTRICT_TEHSILS[distName] && REAL_DISTRICT_TEHSILS[distName].length) {
+        return REAL_DISTRICT_TEHSILS[distName];
+      }
+      for (var t in REAL_DISTRICT_TEHSILS) {
+        if (t.toLowerCase() === target && REAL_DISTRICT_TEHSILS[t].length) {
+          return REAL_DISTRICT_TEHSILS[t];
+        }
+      }
+      return [distName + ' Sadar', distName + ' City', distName + ' Rural'];
+    }
+
     function callBackend(action, args, onSuccess, onFailure) {
       if (isAppsScript) {
         var runner = google.script.run
@@ -1028,13 +1076,9 @@
             } else if (action === 'getDistricts' && (!Array.isArray(res) || res.length === 0)) {
               onSuccess(getFallbackDistricts(args[0]));
             } else if (action === 'getPincodes' && (!Array.isArray(res) || res.length === 0)) {
-              var dist = args[0];
-              var fallbackPins = (fullLocationData && fullLocationData.pincodes && fullLocationData.pincodes[dist]) || DEMO_PINCODES[dist] || ['110001', '400001', '560001', '380001', '600001'];
-              onSuccess(fallbackPins);
+              onSuccess(getFallbackPincodes(args[0]));
             } else if (action === 'getTehsils' && (!Array.isArray(res) || res.length === 0)) {
-              var dist = args[0];
-              var fallbackTehsils = (fullLocationData && fullLocationData.tehsils_by_district && fullLocationData.tehsils_by_district[dist]) || REAL_DISTRICT_TEHSILS[dist] || [];
-              onSuccess(fallbackTehsils);
+              onSuccess(getFallbackTehsils(args[0]));
             } else {
               onSuccess(res);
             }
@@ -1045,11 +1089,9 @@
             } else if (action === 'getDistricts') {
               onSuccess(getFallbackDistricts(args[0]));
             } else if (action === 'getPincodes') {
-              var dist = args[0];
-              onSuccess((fullLocationData && fullLocationData.pincodes && fullLocationData.pincodes[dist]) || DEMO_PINCODES[dist] || []);
+              onSuccess(getFallbackPincodes(args[0]));
             } else if (action === 'getTehsils') {
-              var dist = args[0];
-              onSuccess((fullLocationData && fullLocationData.tehsils_by_district && fullLocationData.tehsils_by_district[dist]) || REAL_DISTRICT_TEHSILS[dist] || []);
+              onSuccess(getFallbackTehsils(args[0]));
             } else if (onFailure) {
               onFailure(err);
             }
@@ -1103,7 +1145,7 @@
 
         if (action === 'getPincodes') {
           var district = args[0];
-          var fallbackPins = (fullLocationData && fullLocationData.pincodes && fullLocationData.pincodes[district]) || DEMO_PINCODES[district] || ['110001', '400001', '560001', '380001', '600001'];
+          var fallbackPins = getFallbackPincodes(district);
           if (webAppUrl) {
             try {
               var u = new URL(webAppUrl);
@@ -1122,10 +1164,9 @@
           return;
         }
 
-
         if (action === 'getTehsils') {
           var dist = args[0];
-          var fallbackTehsils = (fullLocationData && fullLocationData.tehsils_by_district && fullLocationData.tehsils_by_district[dist]) || REAL_DISTRICT_TEHSILS[dist] || [];
+          var fallbackTehsils = getFallbackTehsils(dist);
           if (webAppUrl) {
             try {
               var u = new URL(webAppUrl);
