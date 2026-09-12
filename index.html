@@ -166,6 +166,10 @@
 
       <div class="msg" id="msgBox"></div>
     </form>
+    <div id="backendConfigBar" style="text-align:center; margin-top:16px; font-size:0.8rem; color:#6b7280; display:none;">
+      <span id="urlConfigBtn" style="cursor:pointer; text-decoration:underline; color:#2563eb;">⚙️ Configure Apps Script URL</span>
+      <span id="urlStatus" style="margin-left:8px;"></span>
+    </div>
   </div>
 
   <script>
@@ -180,11 +184,38 @@
       form: document.getElementById('regForm'),
       submitBtn: document.getElementById('submitBtn'),
       spinner: document.getElementById('spinner'),
-      msgBox: document.getElementById('msgBox')
+      msgBox: document.getElementById('msgBox'),
+      backendConfigBar: document.getElementById('backendConfigBar'),
+      urlConfigBtn: document.getElementById('urlConfigBtn'),
+      urlStatus: document.getElementById('urlStatus')
     };
 
     var isAppsScript = typeof google !== 'undefined' && google.script && google.script.run;
     var webAppUrl = localStorage.getItem('apps_script_web_app_url') || '';
+
+    if (!isAppsScript && els.backendConfigBar) {
+      els.backendConfigBar.style.display = 'block';
+      if (webAppUrl) els.urlStatus.textContent = '(Backend Connected)';
+    }
+
+    if (els.urlConfigBtn) {
+      els.urlConfigBtn.addEventListener('click', function () {
+        var current = localStorage.getItem('apps_script_web_app_url') || '';
+        var input = prompt('Enter your published Google Apps Script Web App URL:\n(e.g., https://script.google.com/macros/s/.../exec)', current);
+        if (input !== null) {
+          webAppUrl = input.trim();
+          if (webAppUrl) {
+            localStorage.setItem('apps_script_web_app_url', webAppUrl);
+            els.urlStatus.textContent = '(Backend Connected)';
+            alert('Apps Script Web App URL saved successfully!');
+          } else {
+            localStorage.removeItem('apps_script_web_app_url');
+            els.urlStatus.textContent = '(Not Set)';
+            alert('Backend URL cleared.');
+          }
+        }
+      });
+    }
 
     var fullLocationData = null;
     fetch('location_data.json')

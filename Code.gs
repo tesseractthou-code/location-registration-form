@@ -50,7 +50,8 @@ function getSubmissionsSs() {
         return extSs;
       }
     } catch (e) {
-      console.warn('Could not open SubmissionsSpreadsheetId (' + cleanId + '), using active spreadsheet: ' + e.message);
+      Logger.log('Could not open SubmissionsSpreadsheetId (' + cleanId + '): ' + e.message);
+      throw new Error('Form Submissions Database access error: ' + e.message + '. Ensure Web App deployment is set to "Execute as: Me".');
     }
   }
   return getSs();
