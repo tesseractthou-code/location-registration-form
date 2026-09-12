@@ -2,24 +2,15 @@
  * ============================================================
  *  CASCADING LOCATION REGISTRATION FORM — Apps Script Web App
  * ============================================================
- * Sheets used (auto-created by setupSheets()):
- *   Responses    - all form submissions
+ * Sheets used:
+ *   Responses    - all form submissions (can be stored in external Submissions Database)
  *   Countries    - worldwide country list
  *   IN_States    - India State/UT list
  *   IN_Districts - State/UT -> District mapping
+ *   Sub_Districts- State/UT -> District -> Tehsil mapping
  *   IN_Pincodes  - District -> Pincode -> Tehsil/Block mapping
- *   Config       - AdminEmail, FormTitle, etc.
+ *   Config       - AdminEmail, FormTitle, SubmissionsSpreadsheetId
  *   RawImport    - scratch sheet used by bulkImportLocationData()
- *
- * SETUP (run once from the Apps Script editor):
- *   1. Select "setupSheets" from the function dropdown, click Run.
- *   2. Approve the authorization prompts.
- *   3. (Optional) Run "seedIndiaSampleData" to load a small demo
- *      dataset so you can test the State->District->Pincode cascade
- *      immediately.
- *   4. Replace the sample data with the full official dataset using
- *      bulkImportLocationData() — see README for instructions.
- *   5. Deploy > New deployment > Web app.
  * ============================================================
  */
 
@@ -36,6 +27,10 @@ var SHEET_NAMES = {
 
 var CACHE_SECONDS = 21600; // 6 hours
 
+// ------------------------------------------------------------------
+// SPREADSHEET & SHEET UTILITIES
+// ------------------------------------------------------------------
+
 function getSs() {
   return SpreadsheetApp.getActiveSpreadsheet();
 }
@@ -44,12 +39,16 @@ function getSubmissionsSs() {
   var id = getConfig('SubmissionsSpreadsheetId');
   if (id && String(id).trim() !== '') {
     var cleanId = String(id).trim();
+    // Extract ID if user pasted full Google Sheet URL
     var match = cleanId.match(/\/d\/([a-zA-Z0-9-_]+)/);
     if (match && match[1]) {
       cleanId = match[1];
     }
     try {
-      return SpreadsheetApp.openById(cleanId);
+      var extSs = SpreadsheetApp.openById(cleanId);
+      if (extSs) {
+        return extSs;
+      }
     } catch (e) {
       console.warn('Could not open SubmissionsSpreadsheetId (' + cleanId + '), using active spreadsheet: ' + e.message);
     }
@@ -85,6 +84,10 @@ function getOrCreateSheet(name, headers) {
   return getOrCreateSheetInSs(getSs(), name, headers);
 }
 
+// ------------------------------------------------------------------
+// INITIAL SETUP
+// ------------------------------------------------------------------
+
 function setupSheets() {
   var subSs = getSubmissionsSs();
   getOrCreateSheetInSs(subSs, SHEET_NAMES.RESPONSES, [
@@ -100,9 +103,19 @@ function setupSheets() {
   getOrCreateSheet(SHEET_NAMES.RAW_IMPORT, ['State/UT', 'District', 'Pincode', 'Tehsil/Block']);
 
   var cfg = getOrCreateSheet(SHEET_NAMES.CONFIG, ['Key', 'Value']);
-  if (cfg.getLastRow() < 2) {
+  var data = cfg.getDataRange().getValues();
+  var existingKeys = {};
+  for (var i = 1; i < data.length; i++) {
+    existingKeys[String(data[i][0] || '').trim().toLowerCase()] = true;
+  }
+
+  if (!existingKeys['adminemail']) {
     cfg.appendRow(['AdminEmail', Session.getEffectiveUser().getEmail()]);
+  }
+  if (!existingKeys['formtitle']) {
     cfg.appendRow(['FormTitle', 'Location Registration Form']);
+  }
+  if (!existingKeys['submissionsspreadsheetid']) {
     cfg.appendRow(['SubmissionsSpreadsheetId', '']);
   }
 
@@ -110,6 +123,10 @@ function setupSheets() {
   SpreadsheetApp.flush();
   return 'Setup complete.';
 }
+
+// ------------------------------------------------------------------
+// WEB APP ENDPOINTS
+// ------------------------------------------------------------------
 
 function doGet(e) {
   if (e && e.parameter && e.parameter.action) {
@@ -174,53 +191,12 @@ function handleApiGetRequest(params) {
 }
 
 // ------------------------------------------------------------------
-// SETUP / SEEDING
+// DATA SEEDING & BULK IMPORT
 // ------------------------------------------------------------------
-
-function getSs() {
-  return SpreadsheetApp.getActiveSpreadsheet();
-}
-
-function getOrCreateSheet(name, headers) {
-  var ss = getSs();
-  var sh = ss.getSheetByName(name);
-  if (!sh) {
-    sh = ss.insertSheet(name);
-    if (headers) {
-      sh.appendRow(headers);
-      sh.setFrozenRows(1);
-      sh.getRange(1, 1, 1, headers.length).setFontWeight('bold');
-    }
-  }
-  return sh;
-}
-
-function setupSheets() {
-  getOrCreateSheet(SHEET_NAMES.RESPONSES, [
-    'Timestamp', 'Name', 'Phone', 'Email', 'Country', 'State/UT',
-    'District', 'Pincode', 'Tehsil/Block', 'Address',
-    'Duplicate Phone', 'Duplicate Location', 'Status'
-  ]);
-  getOrCreateSheet(SHEET_NAMES.COUNTRIES, ['Country']);
-  getOrCreateSheet(SHEET_NAMES.STATES, ['State/UT']);
-  getOrCreateSheet(SHEET_NAMES.DISTRICTS, ['State/UT', 'District']);
-  getOrCreateSheet(SHEET_NAMES.PINCODES, ['District', 'Pincode', 'Tehsil/Block', 'State/UT']);
-  getOrCreateSheet(SHEET_NAMES.RAW_IMPORT, ['State/UT', 'District', 'Pincode', 'Tehsil/Block']);
-
-  var cfg = getOrCreateSheet(SHEET_NAMES.CONFIG, ['Key', 'Value']);
-  if (cfg.getLastRow() < 2) {
-    cfg.appendRow(['AdminEmail', Session.getEffectiveUser().getEmail()]);
-    cfg.appendRow(['FormTitle', 'Location Registration Form']);
-  }
-
-  seedCountries();
-  SpreadsheetApp.flush();
-  return 'Setup complete.';
-}
 
 function seedCountries() {
   var sh = getOrCreateSheet(SHEET_NAMES.COUNTRIES, ['Country']);
-  if (sh.getLastRow() > 1) return; // already seeded, don't overwrite edits
+  if (sh.getLastRow() > 1) return;
   var countries = [
     'Afghanistan','Albania','Algeria','Andorra','Angola','Antigua and Barbuda','Argentina','Armenia',
     'Australia','Austria','Azerbaijan','Bahamas','Bahrain','Bangladesh','Barbados','Belarus','Belgium',
@@ -250,10 +226,6 @@ function seedCountries() {
   sh.getRange(2, 1, rows.length, 1).setValues(rows);
 }
 
-/**
- * Small demo dataset so the cascade is testable immediately.
- * REPLACE with the full official dataset via bulkImportLocationData().
- */
 function seedIndiaSampleData() {
   var states = getOrCreateSheet(SHEET_NAMES.STATES, ['State/UT']);
   var districts = getOrCreateSheet(SHEET_NAMES.DISTRICTS, ['State/UT', 'District']);
@@ -306,13 +278,6 @@ function seedIndiaSampleData() {
   return 'Sample India location data loaded.';
 }
 
-/**
- * Bulk import full/official location data.
- * 1. Paste State/UT, District, Pincode, Tehsil/Block columns into the
- *    "RawImport" sheet (with header row matching those 4 columns).
- * 2. Run this function once from the Apps Script editor.
- * It dedupes and rebuilds IN_States, IN_Districts, IN_Pincodes.
- */
 function bulkImportLocationData() {
   var raw = getOrCreateSheet(SHEET_NAMES.RAW_IMPORT, ['State/UT', 'District', 'Pincode', 'Tehsil/Block']);
   var data = raw.getDataRange().getValues();
@@ -372,20 +337,7 @@ function clearLocationCache() {
 }
 
 // ------------------------------------------------------------------
-// CONFIG
-// ------------------------------------------------------------------
-
-function getConfig(key) {
-  var sh = getOrCreateSheet(SHEET_NAMES.CONFIG, ['Key', 'Value']);
-  var data = sh.getDataRange().getValues();
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === key) return data[i][1];
-  }
-  return null;
-}
-
-// ------------------------------------------------------------------
-// DATA FUNCTIONS CALLED FROM THE CLIENT (google.script.run)
+// CLIENT DATA FETCHERS
 // ------------------------------------------------------------------
 
 function uniqueSorted(arr) {
@@ -463,7 +415,7 @@ function getTehsil(district, pincode) {
 }
 
 // ------------------------------------------------------------------
-// SUBMISSION + VALIDATION
+// SUBMISSION & VALIDATION
 // ------------------------------------------------------------------
 
 function normalizePhone(phone) {
@@ -495,7 +447,8 @@ function submitForm(payload) {
       return { success: false, error: 'validation', message: 'Please enter a valid phone number.' };
     }
 
-    var sh = getOrCreateSheetInSs(getSubmissionsSs(), SHEET_NAMES.RESPONSES, [
+    var subSs = getSubmissionsSs();
+    var sh = getOrCreateSheetInSs(subSs, SHEET_NAMES.RESPONSES, [
       'Timestamp', 'Name', 'Phone', 'Email', 'Country', 'State/UT',
       'District', 'Sub-district/Tehsil/Block', 'Pincode', 'Address',
       'Duplicate Phone', 'Duplicate Location', 'Status'
@@ -515,12 +468,19 @@ function submitForm(payload) {
 
     for (var r = 1; r < data.length; r++) {
       var row = data[r];
-      if (normalizePhone(row[col['Phone']]) === phoneNorm) duplicatePhone = true;
+      var rowPhone = col['Phone'] !== undefined ? row[col['Phone']] : row[2];
+      if (normalizePhone(rowPhone) === phoneNorm) duplicatePhone = true;
+
+      var countryVal = col['Country'] !== undefined ? row[col['Country']] : row[4];
+      var stateVal = col['State/UT'] !== undefined ? row[col['State/UT']] : row[5];
+      var distVal = col['District'] !== undefined ? row[col['District']] : row[6];
+      var pinVal = col['Pincode'] !== undefined ? row[col['Pincode']] : row[8];
+      var addrVal = col['Address'] !== undefined ? row[col['Address']] : row[9];
 
       var rowLocationKey = [
-        normalizeText(row[col['Country']]), normalizeText(row[col['State/UT']]),
-        normalizeText(row[col['District']]), normalizeText(row[col['Pincode']]),
-        normalizeText(row[col['Address']])
+        normalizeText(countryVal), normalizeText(stateVal),
+        normalizeText(distVal), normalizeText(pinVal),
+        normalizeText(addrVal)
       ].join('|');
       if (addrNorm && rowLocationKey === thisLocationKey) duplicateLocation = true;
     }
@@ -544,7 +504,7 @@ function submitForm(payload) {
 
     notifyAdmin(payload, duplicateLocation);
 
-    return { success: true, duplicateLocation: duplicateLocation };
+    return { success: true, duplicateLocation: duplicateLocation, targetSheetName: subSs.getName() };
   } catch (err) {
     return { success: false, error: 'server_error', message: err.message };
   } finally {
@@ -572,5 +532,47 @@ function notifyAdmin(payload, duplicateLocation) {
     lines.push('', '⚠ This location (country/state/district/pincode/address) matches an existing submission. The row has been highlighted in the sheet.');
   }
 
-  MailApp.sendEmail(adminEmail, subject, lines.join('\n'));
+  try {
+    MailApp.sendEmail(adminEmail, subject, lines.join('\n'));
+  } catch (e) {
+    console.warn('Could not send notification email: ' + e.message);
+  }
 }
+
+// ------------------------------------------------------------------
+// DIAGNOSTIC / TESTING HELPER
+// ------------------------------------------------------------------
+
+function testSubmissionsDatabaseConnection() {
+  var rawId = getConfig('SubmissionsSpreadsheetId');
+  Logger.log('SubmissionsSpreadsheetId in Config tab: "' + rawId + '"');
+  
+  if (!rawId || String(rawId).trim() === '') {
+    Logger.log('ERROR: SubmissionsSpreadsheetId is empty in the Config tab! Please paste your secondary sheet ID or URL into the Config sheet.');
+    return 'ERROR: SubmissionsSpreadsheetId is empty in Config tab.';
+  }
+  
+  var cleanId = String(rawId).trim();
+  var match = cleanId.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  if (match && match[1]) {
+    cleanId = match[1];
+  }
+  Logger.log('Parsed Spreadsheet ID: ' + cleanId);
+  
+  try {
+    var extSs = SpreadsheetApp.openById(cleanId);
+    Logger.log('Successfully opened target spreadsheet: "' + extSs.getName() + '"');
+    
+    var sh = getOrCreateSheetInSs(extSs, SHEET_NAMES.RESPONSES, [
+      'Timestamp', 'Name', 'Phone', 'Email', 'Country', 'State/UT',
+      'District', 'Sub-district/Tehsil/Block', 'Pincode', 'Address',
+      'Duplicate Phone', 'Duplicate Location', 'Status'
+    ]);
+    Logger.log('Target Responses sheet verified. Title: "' + sh.getName() + '", Total Rows: ' + sh.getLastRow());
+    return 'SUCCESS! Connected to external sheet: ' + extSs.getName();
+  } catch (err) {
+    Logger.log('ERROR opening target spreadsheet: ' + err.message);
+    return 'FAILED: ' + err.message;
+  }
+}
+
