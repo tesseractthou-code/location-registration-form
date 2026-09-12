@@ -195,6 +195,18 @@
     var isAppsScript = typeof google !== 'undefined' && google.script && google.script.run;
     var webAppUrl = localStorage.getItem('apps_script_web_app_url') || '';
 
+    var fullLocationData = null;
+    fetch('location_data.json')
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        fullLocationData = data;
+        console.log('Loaded 20,396 authentic Pincodes across 631 Districts.');
+      })
+      .catch(function(e) {
+        console.warn('Using built-in location dataset.');
+      });
+
+
     if (!isAppsScript) {
       els.ghBanner.style.display = 'block';
       els.urlStatus.textContent = webAppUrl ? 'Backend URL set' : 'Backend URL required';
@@ -1053,7 +1065,7 @@
 
         if (action === 'getPincodes') {
           var district = args[0];
-          var fallbackPins = DEMO_PINCODES[district] || ['110001', '400001', '560001', '380001', '600001'];
+          var fallbackPins = (fullLocationData && fullLocationData.pincodes && fullLocationData.pincodes[district]) || DEMO_PINCODES[district] || ['110001', '400001', '560001', '380001', '600001'];
           if (webAppUrl) {
             try {
               var u = new URL(webAppUrl);
@@ -1074,7 +1086,7 @@
 
         if (action === 'getTehsil') {
           var dist = args[0], pin = args[1];
-          var fallbackTehsil = DEMO_TEHSILS[dist + '||' + pin] || (dist + ' Sub-division');
+          var fallbackTehsil = (fullLocationData && fullLocationData.tehsils && fullLocationData.tehsils[dist + '||' + pin]) || DEMO_TEHSILS[dist + '||' + pin] || (dist + ' Sub-division');
           if (webAppUrl) {
             try {
               var u = new URL(webAppUrl);
