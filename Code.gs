@@ -543,6 +543,24 @@ function notifyAdmin(payload, duplicateLocation) {
 // DIAGNOSTIC / TESTING HELPER
 // ------------------------------------------------------------------
 
+function testSubmitFormDirect() {
+  var testPayload = {
+    name: "Test Submission " + new Date().toLocaleTimeString(),
+    phone: String(Math.floor(1000000000 + Math.random() * 9000000000)),
+    email: "test@example.com",
+    country: "India",
+    state: "Gujarat",
+    district: "Ahmedabad",
+    pincode: "380001",
+    tehsil: "Ahmedabad City",
+    address: "123 Test Street, Block A"
+  };
+  Logger.log("Testing submitForm with payload: " + JSON.stringify(testPayload));
+  var res = submitForm(testPayload);
+  Logger.log("submitForm Result: " + JSON.stringify(res));
+  return res;
+}
+
 function testSubmissionsDatabaseConnection() {
   var rawId = getConfig('SubmissionsSpreadsheetId');
   Logger.log('SubmissionsSpreadsheetId in Config tab: "' + rawId + '"');
@@ -575,4 +593,5 @@ function testSubmissionsDatabaseConnection() {
     return 'FAILED: ' + err.message;
   }
 }
+
 
