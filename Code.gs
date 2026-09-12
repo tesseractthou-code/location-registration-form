@@ -43,13 +43,29 @@ function getSs() {
 function getSubmissionsSs() {
   var id = getConfig('SubmissionsSpreadsheetId');
   if (id && String(id).trim() !== '') {
+    var cleanId = String(id).trim();
+    var match = cleanId.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (match && match[1]) {
+      cleanId = match[1];
+    }
     try {
-      return SpreadsheetApp.openById(id.trim());
+      return SpreadsheetApp.openById(cleanId);
     } catch (e) {
-      console.warn('Could not open SubmissionsSpreadsheetId, using active spreadsheet.');
+      console.warn('Could not open SubmissionsSpreadsheetId (' + cleanId + '), using active spreadsheet: ' + e.message);
     }
   }
   return getSs();
+}
+
+function getConfig(key) {
+  var sh = getOrCreateSheet(SHEET_NAMES.CONFIG, ['Key', 'Value']);
+  var data = sh.getDataRange().getValues();
+  var target = String(key || '').trim().toLowerCase();
+  for (var i = 1; i < data.length; i++) {
+    var k = String(data[i][0] || '').trim().toLowerCase();
+    if (k === target) return data[i][1];
+  }
+  return null;
 }
 
 function getOrCreateSheetInSs(ss, name, headers) {
