@@ -235,6 +235,16 @@
       'Uzbekistan','Vanuatu','Vatican City','Venezuela','Vietnam','Yemen','Zambia','Zimbabwe'
     ];
 
+    var DEFAULT_INDIAN_STATES = [
+      'Andaman and Nicobar Islands', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar',
+      'Chandigarh', 'Chhattisgarh', 'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Goa',
+      'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir', 'Jharkhand', 'Karnataka',
+      'Kerala', 'Ladakh', 'Lakshadweep', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+      'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Puducherry', 'Punjab',
+      'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh',
+      'Uttarakhand', 'West Bengal'
+    ];
+
     function callBackend(action, args, onSuccess, onFailure) {
       if (isAppsScript) {
         var runner = google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure);
@@ -258,14 +268,33 @@
           return;
         }
 
+        if (action === 'getStates') {
+          if (webAppUrl) {
+            try {
+              var u = new URL(webAppUrl);
+              u.searchParams.append('action', 'getStates');
+              if (args[0]) u.searchParams.append('country', args[0]);
+              fetch(u.toString())
+                .then(function(res) { return res.json(); })
+                .then(function(data) { onSuccess(Array.isArray(data) && data.length ? data : DEFAULT_INDIAN_STATES); })
+                .catch(function() { onSuccess(DEFAULT_INDIAN_STATES); });
+            } catch(e) {
+              onSuccess(DEFAULT_INDIAN_STATES);
+            }
+          } else {
+            onSuccess(DEFAULT_INDIAN_STATES);
+          }
+          return;
+        }
+
         if (!webAppUrl) {
-          var inputUrl = prompt('GitHub Pages Mode: Enter your deployed Google Apps Script Web App URL:');
+          var inputUrl = prompt('Enter your deployed Google Apps Script Web App URL to connect live database:');
           if (inputUrl && inputUrl.trim()) {
             webAppUrl = inputUrl.trim();
             localStorage.setItem('apps_script_web_app_url', webAppUrl);
             els.urlStatus.textContent = 'Backend URL set';
           } else {
-            onFailure(new Error('Google Apps Script Web App URL is required for live cascading & form submission. Click "Configure Apps Script URL" above.'));
+            onFailure(new Error('Google Apps Script Web App URL is required for live district/pincode cascading. Click "Configure Apps Script URL" above.'));
             return;
           }
         }
