@@ -28,6 +28,7 @@ var SHEET_NAMES = {
   COUNTRIES: 'Countries',
   STATES: 'IN_States',
   DISTRICTS: 'IN_Districts',
+  SUB_DISTRICTS: 'Sub_Districts',
   PINCODES: 'IN_Pincodes',
   CONFIG: 'Config',
   RAW_IMPORT: 'RawImport'
@@ -35,9 +36,64 @@ var SHEET_NAMES = {
 
 var CACHE_SECONDS = 21600; // 6 hours
 
-// ------------------------------------------------------------------
-// WEB APP ENTRY POINT & REST API (FOR GITHUB PAGES COMPATIBILITY)
-// ------------------------------------------------------------------
+function getSs() {
+  return SpreadsheetApp.getActiveSpreadsheet();
+}
+
+function getSubmissionsSs() {
+  var id = getConfig('SubmissionsSpreadsheetId');
+  if (id && String(id).trim() !== '') {
+    try {
+      return SpreadsheetApp.openById(id.trim());
+    } catch (e) {
+      console.warn('Could not open SubmissionsSpreadsheetId, using active spreadsheet.');
+    }
+  }
+  return getSs();
+}
+
+function getOrCreateSheetInSs(ss, name, headers) {
+  var sh = ss.getSheetByName(name);
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    if (headers) {
+      sh.appendRow(headers);
+      sh.setFrozenRows(1);
+      sh.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    }
+  }
+  return sh;
+}
+
+function getOrCreateSheet(name, headers) {
+  return getOrCreateSheetInSs(getSs(), name, headers);
+}
+
+function setupSheets() {
+  var subSs = getSubmissionsSs();
+  getOrCreateSheetInSs(subSs, SHEET_NAMES.RESPONSES, [
+    'Timestamp', 'Name', 'Phone', 'Email', 'Country', 'State/UT',
+    'District', 'Sub-district/Tehsil/Block', 'Pincode', 'Address',
+    'Duplicate Phone', 'Duplicate Location', 'Status'
+  ]);
+  getOrCreateSheet(SHEET_NAMES.COUNTRIES, ['Country']);
+  getOrCreateSheet(SHEET_NAMES.STATES, ['State/UT']);
+  getOrCreateSheet(SHEET_NAMES.DISTRICTS, ['State/UT', 'District']);
+  getOrCreateSheet(SHEET_NAMES.SUB_DISTRICTS, ['State/UT', 'District', 'Sub-district/Tehsil/Block']);
+  getOrCreateSheet(SHEET_NAMES.PINCODES, ['District', 'Pincode', 'Tehsil/Block', 'State/UT']);
+  getOrCreateSheet(SHEET_NAMES.RAW_IMPORT, ['State/UT', 'District', 'Pincode', 'Tehsil/Block']);
+
+  var cfg = getOrCreateSheet(SHEET_NAMES.CONFIG, ['Key', 'Value']);
+  if (cfg.getLastRow() < 2) {
+    cfg.appendRow(['AdminEmail', Session.getEffectiveUser().getEmail()]);
+    cfg.appendRow(['FormTitle', 'Location Registration Form']);
+    cfg.appendRow(['SubmissionsSpreadsheetId', '']);
+  }
+
+  seedCountries();
+  SpreadsheetApp.flush();
+  return 'Setup complete.';
+}
 
 function doGet(e) {
   if (e && e.parameter && e.parameter.action) {
@@ -246,7 +302,7 @@ function bulkImportLocationData() {
   var data = raw.getDataRange().getValues();
   if (data.length < 2) throw new Error('RawImport sheet is empty. Paste data first.');
 
-  var stateSet = {}, districtSet = {}, districtRows = [], pinSet = {}, pinRows = [];
+  var stateSet = {}, districtSet = {}, districtRows = [], subDistrictSet = {}, subDistrictRows = [], pinSet = {}, pinRows = [];
 
   for (var i = 1; i < data.length; i++) {
     var state = String(data[i][0] || '').trim();
@@ -259,6 +315,11 @@ function bulkImportLocationData() {
 
     var dKey = state + '||' + district;
     if (!districtSet[dKey]) { districtSet[dKey] = true; districtRows.push([state, district]); }
+
+    if (tehsil) {
+      var sdKey = state + '||' + district + '||' + tehsil;
+      if (!subDistrictSet[sdKey]) { subDistrictSet[sdKey] = true; subDistrictRows.push([state, district, tehsil]); }
+    }
 
     var pKey = district + '||' + pincode;
     if (!pinSet[pKey]) { pinSet[pKey] = true; pinRows.push([district, pincode, tehsil, state]); }
@@ -275,13 +336,18 @@ function bulkImportLocationData() {
   districtsSh.appendRow(['State/UT', 'District']);
   if (districtRows.length) districtsSh.getRange(2, 1, districtRows.length, 2).setValues(districtRows);
 
+  var subDistSh = getOrCreateSheet(SHEET_NAMES.SUB_DISTRICTS, ['State/UT', 'District', 'Sub-district/Tehsil/Block']);
+  subDistSh.clearContents();
+  subDistSh.appendRow(['State/UT', 'District', 'Sub-district/Tehsil/Block']);
+  if (subDistrictRows.length) subDistSh.getRange(2, 1, subDistrictRows.length, 3).setValues(subDistrictRows);
+
   var pinSh = getOrCreateSheet(SHEET_NAMES.PINCODES, ['District', 'Pincode', 'Tehsil/Block', 'State/UT']);
   pinSh.clearContents();
   pinSh.appendRow(['District', 'Pincode', 'Tehsil/Block', 'State/UT']);
   if (pinRows.length) pinSh.getRange(2, 1, pinRows.length, 4).setValues(pinRows);
 
   clearLocationCache();
-  return 'Imported ' + stateRows.length + ' states, ' + districtRows.length + ' districts, ' + pinRows.length + ' pincodes.';
+  return 'Imported ' + stateRows.length + ' states, ' + districtRows.length + ' districts, ' + subDistrictRows.length + ' sub-districts, and ' + pinRows.length + ' pincodes.';
 }
 
 function clearLocationCache() {
@@ -413,7 +479,11 @@ function submitForm(payload) {
       return { success: false, error: 'validation', message: 'Please enter a valid phone number.' };
     }
 
-    var sh = getOrCreateSheet(SHEET_NAMES.RESPONSES);
+    var sh = getOrCreateSheetInSs(getSubmissionsSs(), SHEET_NAMES.RESPONSES, [
+      'Timestamp', 'Name', 'Phone', 'Email', 'Country', 'State/UT',
+      'District', 'Sub-district/Tehsil/Block', 'Pincode', 'Address',
+      'Duplicate Phone', 'Duplicate Location', 'Status'
+    ]);
     var data = sh.getDataRange().getValues();
     var header = data[0];
     var col = {};
@@ -447,7 +517,7 @@ function submitForm(payload) {
 
     var newRow = [
       new Date(), payload.name, payload.phone, payload.email || '', payload.country,
-      payload.state || '', payload.district || '', payload.pincode || '', tehsil, payload.address || '',
+      payload.state || '', payload.district || '', tehsil, payload.pincode || '', payload.address || '',
       duplicatePhone ? 'YES' : 'NO', duplicateLocation ? 'YES' : 'NO', duplicateLocation ? 'Flagged' : 'New'
     ];
     sh.appendRow(newRow);
