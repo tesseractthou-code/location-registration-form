@@ -151,7 +151,7 @@
         </select>
 
         <label>Sub-district / Tehsil / Block</label>
-        <input type="text" id="tehsil" readonly placeholder="Auto-filled from pincode">
+        <select id="tehsil" disabled><option value="">Select district first</option></select>
       </div>
 
       <!-- Generic fields for non-India countries -->
@@ -1084,6 +1084,28 @@
           return;
         }
 
+
+        if (action === 'getTehsils') {
+          var dist = args[0];
+          var fallbackTehsils = (fullLocationData && fullLocationData.tehsils_by_district && fullLocationData.tehsils_by_district[dist]) || [];
+          if (webAppUrl) {
+            try {
+              var u = new URL(webAppUrl);
+              u.searchParams.append('action', 'getTehsils');
+              u.searchParams.append('district', dist);
+              fetch(u.toString())
+                .then(function(res) { return res.json(); })
+                .then(function(data) { onSuccess(Array.isArray(data) && data.length ? data : fallbackTehsils); })
+                .catch(function() { onSuccess(fallbackTehsils); });
+            } catch(e) {
+              onSuccess(fallbackTehsils);
+            }
+          } else {
+            onSuccess(fallbackTehsils);
+          }
+          return;
+        }
+
         if (action === 'getTehsil') {
           var dist = args[0], pin = args[1];
           var fallbackTehsil = (fullLocationData && fullLocationData.tehsils && fullLocationData.tehsils[dist + '||' + pin]) || DEMO_TEHSILS[dist + '||' + pin] || (dist + ' Sub-division');
@@ -1173,7 +1195,7 @@
       fillSelect(els.state, [], 'Loading…');
       fillSelect(els.district, [], 'Select state first');
       fillSelect(els.pincode, [], 'Select district first');
-      els.tehsil.value = '';
+      fillSelect(els.tehsil, [], 'Select district first');
 
       if (country === 'India') {
         els.indiaFields.style.display = 'block';
@@ -1197,7 +1219,7 @@
       var state = els.state.value;
       fillSelect(els.district, [], 'Loading…');
       fillSelect(els.pincode, [], 'Select district first');
-      els.tehsil.value = '';
+      fillSelect(els.tehsil, [], 'Select district first');
       if (!state) return;
       callBackend('getDistricts', [state], function (districts) {
         fillSelect(els.district, districts, 'Select district');
@@ -1210,12 +1232,15 @@
     els.district.addEventListener('change', function () {
       var district = els.district.value;
       fillSelect(els.pincode, [], 'Loading…');
-      els.tehsil.value = '';
+      fillSelect(els.tehsil, [], 'Loading…');
       if (!district) return;
       callBackend('getPincodes', [district], function (pincodes) {
         fillSelect(els.pincode, pincodes, 'Select pincode');
       }, function (err) {
         showMsg('error', 'Could not load pincodes: ' + err.message);
+      });
+      callBackend('getTehsils', [district], function (tehsils) {
+        fillSelect(els.tehsil, tehsils, 'Select sub-district / tehsil / block');
       });
     });
 

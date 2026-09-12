@@ -84,6 +84,8 @@ function handleApiGetRequest(params) {
       result = getDistricts(params.state);
     } else if (action === 'getPincodes') {
       result = getPincodes(params.district);
+    } else if (action === 'getTehsils') {
+      result = getTehsils(params.district);
     } else if (action === 'getTehsil') {
       result = getTehsil(params.district, params.pincode);
     } else if (action === 'submitForm') {
@@ -353,6 +355,17 @@ function getPincodes(district) {
   var out = [];
   for (var i = 1; i < data.length; i++) {
     if (data[i][0] === district) out.push(String(data[i][1]));
+  }
+  return uniqueSorted(out);
+}
+
+function getTehsils(district) {
+  if (!district) return [];
+  var sh = getOrCreateSheet(SHEET_NAMES.PINCODES, ['District', 'Pincode', 'Tehsil/Block', 'State/UT']);
+  var data = sh.getDataRange().getValues();
+  var out = [];
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] === district && data[i][2]) out.push(String(data[i][2]));
   }
   return uniqueSorted(out);
 }
