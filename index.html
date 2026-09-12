@@ -104,12 +104,7 @@
 </head>
 <body>
   <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-      <h1 style="margin: 0;">Location Registration Form</h1>
-      <button type="button" id="configUrlBtn" style="font-size: 0.78rem; border: 1px solid #d1d5db; background: #f9fafb; color: #4b5563; padding: 4px 8px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-        ⚙️ <span id="urlStatus">DB Connected</span>
-      </button>
-    </div>
+    <h1>Location Registration Form</h1>
     <p class="subtitle">Fields marked <span class="req">*</span> are required.</p>
 
     <form id="regForm">
@@ -185,9 +180,7 @@
       form: document.getElementById('regForm'),
       submitBtn: document.getElementById('submitBtn'),
       spinner: document.getElementById('spinner'),
-      msgBox: document.getElementById('msgBox'),
-      configUrlBtn: document.getElementById('configUrlBtn'),
-      urlStatus: document.getElementById('urlStatus')
+      msgBox: document.getElementById('msgBox')
     };
 
     var isAppsScript = typeof google !== 'undefined' && google.script && google.script.run;
@@ -203,22 +196,6 @@
       .catch(function(e) {
         console.warn('Using built-in location dataset.');
       });
-
-
-    if (!isAppsScript) {
-      els.urlStatus.textContent = webAppUrl ? 'DB Connected' : 'Set DB URL';
-      els.configUrlBtn.style.display = 'inline-flex';
-      els.configUrlBtn.addEventListener('click', function() {
-        var inputUrl = prompt('Enter your deployed Google Apps Script Web App URL to connect Google Sheets:', webAppUrl);
-        if (inputUrl !== null) {
-          webAppUrl = inputUrl.trim();
-          localStorage.setItem('apps_script_web_app_url', webAppUrl);
-          els.urlStatus.textContent = webAppUrl ? 'DB Connected' : 'Set DB URL';
-        }
-      });
-    } else {
-      els.configUrlBtn.style.display = 'none';
-    }
 
     var DEFAULT_COUNTRIES = [
       'Afghanistan','Albania','Algeria','Andorra','Angola','Antigua and Barbuda','Argentina','Armenia',
