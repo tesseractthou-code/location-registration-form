@@ -43,7 +43,13 @@ function doGet(e) {
   if (e && e.parameter && e.parameter.action) {
     return handleApiGetRequest(e.parameter);
   }
-  return HtmlService.createTemplateFromFile('Index')
+  var template;
+  try {
+    template = HtmlService.createTemplateFromFile('index');
+  } catch (err) {
+    template = HtmlService.createTemplateFromFile('Index');
+  }
+  return template
     .evaluate()
     .setTitle(getConfig('FormTitle') || 'Location Registration Form')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')

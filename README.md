@@ -27,7 +27,7 @@ A production-ready Google Apps Script Web App for collecting location-based regi
 
 ```
 ├── Code.gs                 # Google Apps Script backend logic, database management, RPC endpoints & validations
-├── Index.html              # Web app frontend HTML, CSS styling, and client-side JavaScript logic
+├── index.html              # Web app frontend HTML, CSS styling, client-side JS & GitHub Pages entry point
 ├── RawImport_ready.csv     # Pre-formatted All-India Pincode dataset (34,979 records ready for RawImport sheet)
 ├── format_pincode_csv.py   # Python utility script to format custom raw pincode CSV files
 └── README.md               # Setup, deployment, data import, and GitHub hosting guide
